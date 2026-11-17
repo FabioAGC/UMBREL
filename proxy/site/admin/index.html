@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administração</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 14px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; }
+  pre.erro { white-space: pre-wrap; color: var(--bad); font-size: 12px; margin: 4px 0 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="home" href="/">← Início</a>
+  <h1>Administração</h1>
+  <div class="right"><span class="pill warn">área restrita</span></div>
+</header>
+<main>
+  <!-- ============================================================ ETL -->
+  <h2>ETL MES → Snowflake</h2>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <dl class="kv" id="etl-kv"></dl>
+      <button class="btn" id="rodar">Rodar agora</button>
+    </div>
+  </div>
+  <div class="table-wrap" style="margin-top:12px;max-height:50vh"><table>
+    <thead><tr><th>#</th><th>Origem</th><th>Início</th><th>Duração</th><th>Status</th><th>Linhas</th><th>Janela</th></tr></thead>
+    <tbody id="etl-runs"></tbody>
+  </table></div>
+
+  <!-- ============================================================ OCR -->
+  <h2>Base de guidelines do OCR</h2>
+  <div class="card">
+    <form id="kb-form" class="row">
+      <input type="file" id="kb-arquivos" multiple accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.txt,.yaml,.yml">
+      <label class="row muted" style="gap:6px"><input type="checkbox" id="kb-geral"> vale para todos os materiais (pasta geral/)</label>
+      <button class="btn">Enviar e reindexar</button>
+    </form>
+    <div class="muted" style="font-size:13px;margin-top:8px">
+      Reindexar faz OCR das guidelines novas e pode levar minutos. Os PDFs ficam só no mini PC (volume do OCR), fora do git.
+    </div>
+    <div id="kb-msg"></div>
+  </div>
+  <div class="table-wrap" style="margin-top:12px"><table>
+    <thead><tr><th>Arquivo</th><th>Tamanho</th><th></th></tr></thead>
+    <tbody id="kb-lista"></tbody>
+  </table></div>
+</main>
+
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dt = iso => iso ? new Date(iso).toLocaleString('pt-BR') : '—';
+const STATUS = { ok: 'ok', erro: 'bad', rodando: 'warn', interrompida: 'muted' };
+
+function duracao(a, b) {
+  if (!a || !b) return '—';
+  const s = Math.round((new Date(b) - new Date(a)) / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}min ${s % 60}s`;
+}
+
+async function etl() {
+  try {
+    const d = await (await fetch('/etl/api/status', { cache: 'no-store' })).json();
+    document.getElementById('etl-kv').innerHTML = `
+      <dt>Situação</dt><dd>${d.rodando ? '<span class="pill warn">rodando</span>' : '<span class="pill ok">parada</span>'}</dd>
+      <dt>Próxima execução</dt><dd>${dt(d.proxima_execucao)} (a cada ${d.intervalo_min} min)</dd>
+      <dt>Carregado até</dt><dd>${dt(d.marca_dagua)}</dd>
+      <dt>Destino</dt><dd class="mono">${esc(d.destino)}</dd>`;
+    document.getElementById('rodar').disabled = d.rodando;
+    document.getElementById('etl-runs').innerHTML = d.execucoes.map(e => `
+      <tr><td>${e.id}</td><td>${esc(e.origem)}</td><td>${dt(e.inicio)}</td><td>${duracao(e.inicio, e.fim)}</td>
+      <td><span class="pill ${STATUS[e.status] || 'muted'}">${esc(e.status)}</span>
+        ${e.erro ? `<pre class="erro">${esc(e.erro)}</pre>` : ''}</td>
+      <td>${e.linhas ?? '—'}</td><td class="muted" style="font-size:12px">${dt(e.janela_inicio)}<br>${dt(e.janela_fim)}</td></tr>`).join('')
+      || '<tr><td colspan="7" class="muted">Nenhuma execução ainda.</td></tr>';
+  } catch (e) {
+    document.getElementById('etl-kv').innerHTML = `<dt>Erro</dt><dd class="muted">ETL indisponível (${esc(e.message)})</dd>`;
+  }
+}
+
+document.getElementById('rodar').onclick = async () => {
+  const r = await fetch('/etl/api/run', { method: 'POST' });
+  if (!r.ok) alert((await r.json()).detail || 'Não foi possível iniciar');
+  etl();
+};
+
+async function kb() {
+  try {
+    const lista = await (await fetch('/ocr/api/kb/files', { cache: 'no-store' })).json();
+    document.getElementById('kb-lista').innerHTML = lista.map(f => `
+      <tr><td class="mono">${esc(f.nome)}</td><td>${(f.bytes / 1024).toFixed(0)} KB</td>
+      <td><button class="btn ghost" data-nome="${esc(f.nome)}">Apagar</button></td></tr>`).join('')
+      || '<tr><td colspan="3" class="muted">Base vazia: envie as guidelines (PDFs internos por material).</td></tr>';
+    document.querySelectorAll('#kb-lista button').forEach(b => b.onclick = async () => {
+      if (!confirm(`Apagar ${b.dataset.nome}?`)) return;
+      await fetch('/ocr/api/kb/files/' + encodeURIComponent(b.dataset.nome).replace(/%2F/g, '/'), { method: 'DELETE' });
+      kb();
+    });
+  } catch (e) {
+    document.getElementById('kb-lista').innerHTML = `<tr><td colspan="3" class="muted">OCR indisponível.</td></tr>`;
+  }
+}
+
+document.getElementById('kb-form').onsubmit = async ev => {
+  ev.preventDefault();
+  const arqs = document.getElementById('kb-arquivos').files;
+  if (!arqs.length) return;
+  const fd = new FormData();
+  [...arqs].forEach(a => fd.append('arquivos', a));
+  const msg = document.getElementById('kb-msg');
+  msg.innerHTML = '<div class="banner warn" style="margin-top:10px">Enviando e reindexando…</div>';
+  const geral = document.getElementById('kb-geral').checked;
+  const r = await fetch('/ocr/api/kb/upload' + (geral ? '?geral=true' : ''), { method: 'POST', body: fd });
+  const d = await r.json();
+  msg.innerHTML = r.ok
+    ? `<div class="banner" style="margin-top:10px;border:1px solid var(--ok)">Ok: ${d.salvos.length} arquivo(s). Base com ${d.docs.length} documento(s).</div>`
+    : `<div class="banner bad" style="margin-top:10px">Erro: ${esc(JSON.stringify(d.detail || d))}</div>`;
+  kb();
+};
+
+etl(); kb();
+setInterval(etl, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+# Proxy único da fábrica. Tudo por caminho, num só endereço HTTPS.
+#
+#   /             portal (links para tudo)
+#   /quiz-ma/     quiz de Manutenção Autônoma (grava no Google Sheets)
+#   /quiz-5s/     quiz de 5S (grava no Google Sheets)
+#   /historian/   2 painéis  -> /historian/api/*  -> historian-api
+#   /mes/         últimos 7 dias -> /mes/api/*    -> mes-api
+#   /ocr/         laudo-check   -> /ocr/api/*     -> ocr
+#   /admin/       status da ETL + base do OCR     (LOGIN)
+#   /etl/api/*    etl-mes                         (LOGIN)
+#   /dimep/       dashboard de acesso/pausas      (LOGIN, dados de RH)
+#   /mcp          MCP do MES                      (token Bearer, no gateway)
+#   /ca.crt       certificado raiz para instalar nos dispositivos
+
+{
+	# O Umbrel ocupa a porta 80: o Caddy atende só HTTPS e não tenta redirecionar.
+	auto_https disable_redirects
+	http_port 8080
+	# Acesso pelo IP não manda SNI; sem isto o Caddy não sabe qual certificado entregar
+	default_sni {$SITE_IP}
+}
+
+{$SITE_HOSTNAME}, {$SITE_IP} {
+	tls internal
+
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		X-Frame-Options SAMEORIGIN
+		-Server
+	}
+
+	# ------------------------------------------------------------ login (admin)
+	@protegido path /admin /admin/* /etl/api/* /dimep /dimep/* /ocr/api/kb/*
+	basic_auth @protegido {
+		{$ADMIN_USER} {$ADMIN_PASSWORD_HASH}
+	}
+
+	# ------------------------------------------------------------ certificado raiz
+	handle /ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		header Content-Disposition "attachment; filename=fabrica-apps-ca.crt"
+		file_server
+	}
+
+	# ------------------------------------------------------------ APIs
+	handle_path /historian/api/* {
+		reverse_proxy historian-api:8000
+	}
+
+	handle_path /mes/api/* {
+		reverse_proxy mes-api:8000
+	}
+
+	handle_path /etl/api/* {
+		reverse_proxy etl-mes:8000
+	}
+
+	handle_path /ocr/api/* {
+		request_body {
+			max_size 30MB
+		}
+		reverse_proxy ocr:8000 {
+			transport http {
+				read_timeout 30m
+			}
+		}
+	}
+
+	# MCP (streamable HTTP). O token é conferido no próprio gateway (SUPERGATEWAY_API_KEY).
+	handle /mcp* {
+		reverse_proxy mcp-mes:8000 {
+			flush_interval -1
+		}
+	}
+
+	# ------------------------------------------------------------ DIMEP
+	# O servidor do DIMEP serve a pasta inteira (código e parquets brutos).
+	# Aqui só passam o dashboard e os JSONs que ele consome; o resto é 404.
+	# (tudo num bloco só: o Caddy ordena "handle /caminho" antes de "handle @nomeado")
+	redir /dimep /dimep/
+	handle /dimep/* {
+		@dimep_ok path_regexp ^/dimep/(dashboard\.html|validacao\.json|pessoas_pausas_resumo\.json|presenca\.json|pausas_pessoas/\d+\.json)?$
+		handle @dimep_ok {
+			rewrite /dimep/ /dimep/dashboard.html
+			uri strip_prefix /dimep
+			reverse_proxy dimep:8000
+		}
+		respond 404
+	}
+
+	# ------------------------------------------------------------ páginas estáticas
+	handle {
+		root * /srv
+		file_server
+	}
+}

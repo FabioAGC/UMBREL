@@ -1,0 +1,9 @@
+# Limiares do laudo-check. Ajuste com `laudo-check calibrar` em laudos rotulados, não no olho.
+approve: 0.80          # P(atende) >= approve -> conforme
+reject: 0.30           # P(atende) <= reject  -> irregular (entre os dois: revisão humana)
+is_requirement: 0.60   # só vale para guidelines ainda sem <doc>.requisitos.yaml revisado
+double_check: true     # pergunta "atende?" e "viola?" e exige coerência
+max_disagreement: 0.35
+min_ocr_conf: 60       # média de confiança do Tesseract por página do laudo
+max_laudo_chars: 60000
+workers: 1             # Ollama local atende 1 pergunta por vez; mais threads só enfileiram

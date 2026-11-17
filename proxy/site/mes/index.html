@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MES: últimos 7 dias</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpis .card .n { font-size: 28px; font-weight: 700; }
+  .pager { margin-top: 10px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="home" href="/">← Início</a>
+  <h1>MES: últimos 7 dias</h1>
+  <div class="right"><span id="status" class="pill muted">carregando…</span></div>
+</header>
+<main>
+  <div id="erro"></div>
+  <div class="kpis">
+    <div class="card"><div class="muted">Registros</div><div class="n" id="k-total">—</div></div>
+    <div class="card"><div class="muted">Período</div><div id="k-periodo" class="mono">—</div></div>
+    <div class="card"><div class="muted">Atualizado em</div><div id="k-atual" class="mono">—</div></div>
+  </div>
+  <div class="row" style="margin-bottom:12px">
+    <input type="search" id="busca" placeholder="Buscar em qualquer coluna…" style="flex:1;min-width:240px">
+    <a class="btn ghost" href="/mes/api/registros.csv">Baixar CSV</a>
+  </div>
+  <div class="table-wrap"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+  <div class="row pager"><span id="info" class="muted"></span>
+    <button class="btn ghost" id="mais">Mostrar mais</button></div>
+</main>
+
+<script>
+// Lê do cache do mes-api (/mes/api/registros); o MES é consultado só pelo servidor.
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dataBR = iso => iso ? new Date(iso).toLocaleString('pt-BR') : '—';
+let linhas = [], colunas = [], filtradas = [], ordem = { col: null, asc: true }, limite = 300;
+
+function celula(v) {
+  if (v == null) return '';
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) return dataBR(v);
+  if (typeof v === 'object') return JSON.stringify(v);
+  return v;
+}
+
+function aplicar() {
+  const q = document.getElementById('busca').value.trim().toLowerCase();
+  filtradas = q ? linhas.filter(l => colunas.some(c => String(l[c] ?? '').toLowerCase().includes(q))) : linhas.slice();
+  if (ordem.col) {
+    const c = ordem.col, s = ordem.asc ? 1 : -1;
+    filtradas.sort((a, b) => (a[c] ?? '') > (b[c] ?? '') ? s : (a[c] ?? '') < (b[c] ?? '') ? -s : 0);
+  }
+  desenhar();
+}
+
+function desenhar() {
+  document.getElementById('th').innerHTML = '<tr>' + colunas.map(c =>
+    `<th data-c="${esc(c)}">${esc(c)}${ordem.col === c ? (ordem.asc ? ' ▲' : ' ▼') : ''}</th>`).join('') + '</tr>';
+  document.querySelectorAll('#th th').forEach(th => th.onclick = () => {
+    ordem = { col: th.dataset.c, asc: ordem.col === th.dataset.c ? !ordem.asc : true }; aplicar();
+  });
+  document.getElementById('tb').innerHTML = filtradas.slice(0, limite).map(l =>
+    '<tr>' + colunas.map(c => `<td>${esc(celula(l[c]))}</td>`).join('') + '</tr>').join('');
+  document.getElementById('info').textContent =
+    `Mostrando ${Math.min(limite, filtradas.length).toLocaleString('pt-BR')} de ${filtradas.length.toLocaleString('pt-BR')}`;
+  document.getElementById('mais').style.display = filtradas.length > limite ? '' : 'none';
+}
+
+async function carregar() {
+  const s = document.getElementById('status');
+  try {
+    const d = await (await fetch('/mes/api/registros', { cache: 'no-store' })).json();
+    linhas = d.linhas || [];
+    colunas = [...new Set(linhas.slice(0, 200).flatMap(Object.keys))];
+    document.getElementById('k-total').textContent = (d.total || 0).toLocaleString('pt-BR');
+    document.getElementById('k-periodo').textContent = d.inicio ? `${dataBR(d.inicio)} → ${dataBR(d.fim)}` : '—';
+    document.getElementById('k-atual').textContent = dataBR(d.atualizado_em);
+    document.getElementById('erro').innerHTML = d.erro
+      ? `<div class="banner bad">Última atualização falhou (mostrando o último dado bom): ${esc(d.erro)}</div>` : '';
+    s.className = 'pill ' + (d.erro ? 'warn' : 'ok');
+    s.textContent = `atualiza a cada ${d.refresh_min} min`;
+    aplicar();
+  } catch (e) { s.className = 'pill bad'; s.textContent = 'sem conexão'; }
+}
+
+document.getElementById('busca').oninput = () => { limite = 300; aplicar(); };
+document.getElementById('mais').onclick = () => { limite += 300; desenhar(); };
+carregar();
+setInterval(carregar, 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aplicações da Fábrica</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="top">
+  <h1>Aplicações da Fábrica</h1>
+  <div class="right"><span id="relogio" class="mono"></span></div>
+</header>
+
+<main>
+  <h2>Operação</h2>
+  <div class="grid">
+    <a class="card" href="/quiz-ma/">
+      <div class="title">Auditoria de MA</div>
+      <div class="desc">Quiz de Manutenção Autônoma, passos 1 a 3.</div>
+    </a>
+    <a class="card" href="/quiz-5s/">
+      <div class="title">Auditoria de 5S</div>
+      <div class="desc">Quiz de 5S por área.</div>
+    </a>
+    <a class="card" href="/historian/">
+      <div class="title">Painéis do Historian</div>
+      <div class="desc">Tanques e totalizadores em tempo real.</div>
+    </a>
+    <a class="card" href="/mes/">
+      <div class="title">MES: últimos 7 dias</div>
+      <div class="desc">Registros do MES, com busca e exportação.</div>
+    </a>
+    <a class="card" href="/ocr/">
+      <div class="title">Validação de laudos</div>
+      <div class="desc">Envie o laudo do fornecedor e veja o veredito.</div>
+    </a>
+  </div>
+
+  <h2>Área restrita</h2>
+  <div class="grid">
+    <a class="card" href="/admin/">
+      <span class="tag lock">login</span>
+      <div class="title">Administração</div>
+      <div class="desc">Status da ETL do MES e base de guidelines do OCR.</div>
+    </a>
+    <a class="card" href="/dimep/">
+      <span class="tag lock">login</span>
+      <div class="title">DIMEP: acessos e pausas</div>
+      <div class="desc">Dados pessoais (RH). Acesso restrito.</div>
+    </a>
+  </div>
+</main>
+
+<footer>
+  Aparecendo aviso de certificado? <a href="/ca.crt">Baixe o certificado da fábrica</a> e instale como
+  "Autoridade de certificação raiz confiável" (uma vez por dispositivo).
+</footer>
+
+<script>
+  const r = document.getElementById('relogio');
+  const tick = () => r.textContent = new Date().toLocaleString('pt-BR');
+  tick(); setInterval(tick, 1000);
+</script>
+</body>
+</html>

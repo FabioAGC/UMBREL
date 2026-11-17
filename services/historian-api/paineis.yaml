@@ -1,0 +1,36 @@
+# >>> AJUSTE AQUI <<<  Os 2 painéis e as tags que cada um lê.
+# Troque as tags de exemplo pelas dos seus painéis atuais.
+#
+# intervalo_s       de quanto em quanto tempo o valor atual é lido
+# janela_min        quanto histórico aparece no mini-gráfico
+# resolucao_hist_ms resolução do histórico (60000 = 1 ponto por minuto)
+# por tag: fqn (obrigatório), nome, unidade, min/max (faixa do card, opcional),
+#          expressao (opcional, ex.: "UOM([Tag],[Hz])", igual ao historian_realtime.py)
+
+paineis:
+  - id: oleina
+    titulo: Tanques de oleína
+    intervalo_s: 5
+    janela_min: 120
+    resolucao_hist_ms: 60000
+    tags:
+      - { fqn: Tot_Oleina.Tanque_01_Massa, nome: "Tanque 01 – massa", unidade: kg }
+      - { fqn: Tot_Oleina.Tanque_02_Massa, nome: "Tanque 02 – massa", unidade: kg }
+      - { fqn: Tot_Oleina.Tanque_03_Massa, nome: "Tanque 03 – massa", unidade: kg }
+      - { fqn: Tot_Oleina.Tanque_04_Massa, nome: "Tanque 04 – massa", unidade: kg }
+      - { fqn: Tot_Oleina.Tanque_05_Massa, nome: "Tanque 05 – massa", unidade: kg }
+      - { fqn: Tot_Oleina.Tanque_06_Massa, nome: "Tanque 06 – massa", unidade: kg }
+      - fqn: Tot_Oleina.Tanque_06_Nivel
+        nome: "Tanque 06 – nível"
+        unidade: Hz
+        expressao: "UOM([Tot_Oleina.Tanque_06_Nivel],[Hz])"
+
+  - id: linhas
+    titulo: Totalizadores das linhas
+    intervalo_s: 10
+    janela_min: 240
+    resolucao_hist_ms: 120000
+    tags:
+      - { fqn: Tot_Oleina.TOT_B200, nome: "B200 – totalizador", unidade: kg }
+      - { fqn: Tot_Oleina.TOT_PC50, nome: "PC50 – totalizador", unidade: kg }
+      - { fqn: Tot_Oleina.TOT_PC21, nome: "PC21 – totalizador", unidade: kg }

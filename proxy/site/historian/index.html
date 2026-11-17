@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painéis do Historian</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tabs button { background: var(--panel); color: var(--muted); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 16px; font-size: 15px; cursor: pointer; }
+  .tabs button.on { color: var(--text); border-color: var(--accent); }
+  .tag-card .nome { color: var(--muted); font-size: 14px; }
+  .tag-card .valor { font-size: 38px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0; }
+  .tag-card .valor small { font-size: 16px; color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .tag-card .meta { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+  .tag-card svg { width: 100%; height: 46px; display: block; margin-top: 8px; }
+  .tag-card.velho { opacity: .55; }
+  .tag-card .err { color: var(--bad); font-size: 12px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="home" href="/">← Início</a>
+  <h1>Painéis do Historian</h1>
+  <div class="right"><span id="status" class="pill muted">conectando…</span></div>
+</header>
+<main>
+  <div class="tabs" id="tabs"></div>
+  <div id="erro"></div>
+  <div class="grid" id="cards"></div>
+</main>
+
+<script>
+// Os dados vêm de /historian/api (cache no servidor): o navegador nunca fala com o Historian.
+const API = '/historian/api';
+let paineis = [], atual = null, timer = null;
+
+const fmt = v => typeof v === 'number'
+  ? v.toLocaleString('pt-BR', { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 }) : (v ?? '—');
+const hora = iso => iso ? new Date(iso).toLocaleTimeString('pt-BR') : '—';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function sparkline(hist) {
+  const ys = hist.map(p => p[1]).filter(v => typeof v === 'number');
+  if (ys.length < 2) return '<svg></svg>';
+  const min = Math.min(...ys), max = Math.max(...ys), span = (max - min) || 1;
+  const pts = ys.map((y, i) => `${(i / (ys.length - 1) * 100).toFixed(2)},${(44 - (y - min) / span * 40).toFixed(2)}`);
+  return `<svg viewBox="0 0 100 46" preserveAspectRatio="none">
+    <polyline fill="none" stroke="var(--accent)" stroke-width="1.6" vector-effect="non-scaling-stroke" points="${pts.join(' ')}"/></svg>`;
+}
+
+function render(p) {
+  const erro = document.getElementById('erro');
+  erro.innerHTML = p.erro ? `<div class="banner bad">Erro na leitura: ${esc(p.erro)}</div>` : '';
+  const limiteVelho = (p.intervalo_s || 5) * 4 * 1000;
+  document.getElementById('cards').innerHTML = p.tags.map(t => {
+    const velho = !t.ts || (Date.now() - new Date(t.ts)) > Math.max(limiteVelho, 60000);
+    const q = t.qualidade == null ? '' : (t.qualidade === 192 ? 'boa' : `q=${t.qualidade}`);
+    return `<div class="card tag-card ${velho ? 'velho' : ''}">
+      <div class="nome">${esc(t.nome)}</div>
+      <div class="valor">${fmt(t.valor)}<small>${esc(t.unidade || '')}</small></div>
+      <div class="meta"><span>${hora(t.ts)}</span><span>${esc(q)}</span></div>
+      ${sparkline(t.historico || [])}
+      ${t.erro ? `<div class="err">${esc(t.erro)}</div>` : ''}
+    </div>`;
+  }).join('');
+  const s = document.getElementById('status');
+  s.className = 'pill ' + (p.erro ? 'bad' : 'ok');
+  s.textContent = p.erro ? 'com erro' : 'atualizado ' + hora(p.atualizado_em);
+}
+
+async function carregar() {
+  try {
+    const r = await fetch(`${API}/paineis/${atual.id}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    render(await r.json());
+  } catch (e) {
+    const s = document.getElementById('status');
+    s.className = 'pill bad'; s.textContent = 'sem conexão';
+  }
+}
+
+function abrir(id) {
+  atual = paineis.find(p => p.id === id) || paineis[0];
+  history.replaceState(null, '', '#' + atual.id);
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.id === atual.id));
+  clearInterval(timer);
+  carregar();
+  timer = setInterval(carregar, Math.max(2, atual.intervalo_s) * 1000);
+}
+
+(async () => {
+  paineis = await (await fetch(`${API}/paineis`)).json();
+  document.getElementById('tabs').innerHTML = paineis
+    .map(p => `<button data-id="${esc(p.id)}">${esc(p.titulo)}</button>`).join('');
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => abrir(b.dataset.id));
+  abrir(location.hash.slice(1));
+})();
+</script>
+</body>
+</html>

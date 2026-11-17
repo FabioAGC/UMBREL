@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validação de laudos</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .drop { border: 2px dashed var(--line); border-radius: var(--radius); padding: 30px; text-align: center; background: var(--panel); }
+  .drop.on { border-color: var(--accent); }
+  .veredito { font-size: 30px; font-weight: 800; letter-spacing: .03em; }
+  .APROVADO { color: var(--ok); } .REPROVADO { color: var(--bad); } .REVISAO_HUMANA { color: var(--warn); }
+  #esperando { display: none; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="home" href="/">← Início</a>
+  <h1>Validação de laudos</h1>
+  <div class="right muted">processado no servidor da fábrica (nada sai da rede)</div>
+</header>
+<main>
+  <form id="f">
+    <label class="drop" id="drop">
+      <div style="font-size:18px;font-weight:600">Arraste o laudo aqui ou toque para escolher</div>
+      <div class="muted">PDF ou foto (300 dpi, sem inclinação, dá o melhor resultado)</div>
+      <input type="file" id="arquivo" name="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.txt" style="margin-top:12px">
+    </label>
+    <div class="row" style="margin-top:12px">
+      <input type="text" name="material" id="material" placeholder="Material (opcional; preencha se der 'material ambíguo')" style="flex:1;min-width:240px">
+      <button class="btn" id="enviar">Validar</button>
+    </div>
+  </form>
+
+  <div id="esperando" class="banner warn" style="margin-top:16px">
+    Processando… OCR e análise rodam no mini PC, sem GPU: pode levar alguns minutos. Não feche a página.
+  </div>
+  <div id="saida" style="margin-top:16px"></div>
+</main>
+
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = p => p == null ? '—' : Math.round(p * 100) + '%';
+const STATUS = { conforme: ['ok', 'conforme'], irregular: ['bad', 'irregular'], revisao_humana: ['warn', 'revisar'] };
+const VER = { APROVADO: 'Aprovado', REPROVADO: 'Reprovado', REVISAO_HUMANA: 'Revisão humana' };
+
+const drop = document.getElementById('drop');
+['dragover', 'dragenter'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('on'); }));
+['dragleave', 'drop'].forEach(e => drop.addEventListener(e, () => drop.classList.remove('on')));
+drop.addEventListener('drop', ev => { ev.preventDefault(); document.getElementById('arquivo').files = ev.dataTransfer.files; });
+
+function mostrar(d) {
+  const linhas = (d.results || []).map(r => {
+    const [cls, txt] = STATUS[r.status] || ['muted', r.status];
+    return `<tr><td><span class="pill ${cls}">${txt}</span></td><td>${esc(r.requirement)}
+      <div class="muted mono" style="font-size:12px">${esc(r.ref)} · ${esc(r.severity)}</div></td>
+      <td class="mono">${pct(r.p)}</td><td class="muted">${esc(r.reason)}</td></tr>`;
+  }).join('');
+  document.getElementById('saida').innerHTML = `
+    <div class="card">
+      <div class="veredito ${esc(d.verdict)}">${VER[d.verdict] || esc(d.verdict)}</div>
+      <div class="muted">Guideline: ${esc((d.guidelines || []).join(', ') || '—')}</div>
+      ${(d.warnings || []).map(w => `<div class="banner warn" style="margin-top:10px">${esc(w)}</div>`).join('')}
+    </div>
+    <h2>Requisitos</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Status</th><th>Requisito</th><th>P(atende)</th><th>Motivo</th></tr></thead>
+      <tbody>${linhas || '<tr><td colspan="4" class="muted">Nenhum requisito avaliado.</td></tr>'}</tbody>
+    </table></div>`;
+}
+
+document.getElementById('f').onsubmit = async ev => {
+  ev.preventDefault();
+  const arq = document.getElementById('arquivo').files[0];
+  if (!arq) return alert('Escolha o arquivo do laudo.');
+  const fd = new FormData();
+  fd.append('file', arq);
+  const mat = document.getElementById('material').value.trim();
+  if (mat) fd.append('material', mat);
+  const btn = document.getElementById('enviar');
+  btn.disabled = true;
+  document.getElementById('esperando').style.display = 'block';
+  document.getElementById('saida').innerHTML = '';
+  try {
+    const r = await fetch('/ocr/api/validar', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (r.status === 409 && d.detail?.candidates) {
+      document.getElementById('saida').innerHTML = `<div class="banner warn">Não deu para saber o material.
+        Preencha o campo "Material" com um destes e valide de novo:
+        <b>${d.detail.candidates.map(c => esc(Array.isArray(c) ? c[0] : (c.doc || c))).join(', ')}</b></div>`;
+    } else if (!r.ok) {
+      document.getElementById('saida').innerHTML = `<div class="banner bad">Erro ${r.status}: ${esc(JSON.stringify(d.detail || d))}</div>`;
+    } else mostrar(d);
+  } catch (e) {
+    document.getElementById('saida').innerHTML = `<div class="banner bad">Falha de conexão: ${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    document.getElementById('esperando').style.display = 'none';
+  }
+};
+</script>
+</body>
+</html>

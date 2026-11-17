@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>Validação — LOG_ACESSO</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --border: #e3e6ea;
+    --text: #1c2430;
+    --muted: #66707c;
+    --accent: #2f6fed;
+    --entrada: #2e9e5b;
+    --saida: #d1483f;
+    --outro: #9a8c2e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    padding: 32px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .card .value { font-size: 24px; font-weight: 600; margin-top: 4px; }
+  section { margin-bottom: 32px; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; background: #fafbfc; }
+  tr:last-child td { border-bottom: none; }
+  .bar-cell { display: flex; align-items: center; gap: 8px; }
+  .bar-track { flex: 1; height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden; min-width: 60px; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; }
+  .tag-ENTRADA { background: var(--entrada); }
+  .tag-SAIDA { background: var(--saida); }
+  .tag-OUTRO { background: var(--outro); }
+  .scroll-x { overflow-x: auto; }
+  .warn { color: var(--saida); font-weight: 600; }
+  .ok { color: var(--entrada); font-weight: 600; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    border: none; background: none; cursor: pointer;
+    padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--muted);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-page { display: none; }
+  .tab-page.active { display: block; }
+
+  .filtros-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 16px; }
+  .search-box {
+    flex: 1; min-width: 220px; max-width: 420px; padding: 10px 14px; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--card); color: var(--text);
+  }
+  .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; user-select: none; }
+  .checkbox-label input { cursor: pointer; }
+  .periodo-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .month-input {
+    padding: 7px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--card); color: var(--text);
+  }
+  .link-btn {
+    border: none; background: none; color: var(--accent); font-size: 13px; cursor: pointer; padding: 0;
+    text-decoration: underline;
+  }
+  .hint { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: #f2f5fb; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #fde8e6; color: var(--saida); }
+  .pill-ativo { background: #e3f5ea; color: var(--entrada); }
+  .pill-inativo { background: #f0f1f3; color: var(--muted); }
+  .pill-desconhecido { background: #fdf2e0; color: #9a6b1f; }
+  .detail-panel {
+    display: none; margin-top: 20px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px;
+  }
+  .detail-panel.active { display: block; }
+  .detail-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
+  .detail-header h3 { margin: 0; font-size: 16px; }
+  .detail-stats { display: flex; gap: 20px; margin: 14px 0 18px; flex-wrap: wrap; }
+  .detail-stats div { font-size: 13px; color: var(--muted); }
+  .detail-stats b { display: block; font-size: 18px; color: var(--text); font-weight: 600; }
+  .close-btn { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 13px; }
+  .close-btn:hover { color: var(--text); }
+  .empty-msg { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+
+  tr.day-header-row td { background: #f3f5f8; padding: 6px 12px; border-bottom: 1px solid var(--border); }
+  .day-header { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
+  .day-header > span:first-child { color: var(--muted); font-weight: 600; text-transform: capitalize; }
+  .day-total { color: var(--text); font-weight: 600; }
+
+  .subtabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .subtab-btn {
+    border: 1px solid var(--border); background: var(--card); color: var(--muted);
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .subtab-btn.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+  .presenca-layout { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 8px; }
+  .presenca-filtros { flex: 0 0 260px; }
+  .presenca-chart-wrap { flex: 1; min-width: 320px; }
+
+  .export-btn {
+    display: inline-flex; align-items: center; gap: 6px; border: none; background: var(--entrada);
+    color: #fff; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+    margin-bottom: 16px;
+  }
+  .export-btn:hover { opacity: .9; }
+
+  .total-presentes { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+  .total-presentes b { font-size: 26px; color: var(--text); display: block; font-weight: 700; }
+
+  .lista-estruturas { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+  .lista-estruturas .checkbox-label { justify-content: space-between; }
+  .todas-label { font-weight: 700; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+  .bar-chart-vert {
+    display: flex; align-items: flex-end; gap: 12px; height: 240px; padding: 10px 4px 0;
+    overflow-x: auto; border-bottom: 1px solid var(--border);
+  }
+  .bar-chart-vert .barra-col { display: flex; flex-direction: column; align-items: center; min-width: 52px; height: 100%; justify-content: flex-end; flex-shrink: 0; }
+  .bar-chart-vert .barra-valor { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .bar-chart-vert .barra { width: 36px; border-radius: 6px 6px 0 0; min-height: 2px; }
+  .bar-chart-vert .barra-label {
+    font-size: 11px; color: var(--muted); margin-top: 6px; max-width: 70px; text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .turno-stats { display: flex; flex-direction: column; max-width: 440px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+  .turno-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .turno-stat-row:last-child { border-bottom: none; }
+  .turno-badge { display: inline-block; min-width: 44px; text-align: center; padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 13px; background: #e3f5ea; color: var(--entrada); }
+  .turno-badge.alerta { background: #fde8e6; color: var(--saida); }
+</style>
+</head>
+<body>
+  <h1>Validação — dbo.LOG_ACESSO (parquet)</h1>
+  <div class="sub" id="gerado-em"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="geral">Visão geral</button>
+    <button class="tab-btn" data-tab="colaboradores">Movimentações por setor</button>
+    <button class="tab-btn" data-tab="presenca">Presença &amp; turnos</button>
+  </div>
+
+  <div class="tab-page active" id="page-geral">
+  <div class="grid" id="cards"></div>
+
+  <section>
+    <h2>Arquivos gerados</h2>
+    <div class="scroll-x">
+      <table id="tbl-arquivos"></table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Movimentos (entrada / saída / outro)</h2>
+    <div class="scroll-x">
+      <table id="tbl-movimentos"></table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Top transições de área</h2>
+    <div class="scroll-x">
+      <table id="tbl-transicoes"></table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Top estruturas organizacionais</h2>
+    <div class="scroll-x">
+      <table id="tbl-estruturas"></table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Qualidade dos dados (nulos por coluna)</h2>
+    <div class="scroll-x">
+      <table id="tbl-nulos"></table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Amostra de registros</h2>
+    <div class="scroll-x">
+      <table id="tbl-amostra"></table>
+    </div>
+  </section>
+  </div>
+
+  <div class="tab-page" id="page-colaboradores">
+    <section>
+      <h2>Tempo fora do posto por colaborador (idas e voltas no mesmo dia, qualquer setor)</h2>
+      <div class="hint">Considera qualquer saída da área interna — fábrica (Externa), refeitório, café, linhas de produção, parking, PCD, ambulatório — com volta no mesmo dia. A saída normal de fim de expediente não entra aqui, pois só volta no dia seguinte.</div>
+      <div class="filtros-row">
+        <input type="text" class="search-box" id="busca-colaborador"
+               placeholder="Digite o nome ou a matrícula do colaborador..." autocomplete="off" />
+        <label class="checkbox-label">
+          <input type="checkbox" id="filtro-media-alta" />
+          Só operadores com média de tempo fora &gt; 1h
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="filtro-ativos-sem-pausa" />
+          Só ativos sem nenhuma movimentação registrada (possível gap de dados)
+        </label>
+      </div>
+      <div class="filtros-row">
+        <label class="periodo-label">
+          De <input type="month" id="periodo-inicio" class="month-input" />
+        </label>
+        <label class="periodo-label">
+          Até <input type="month" id="periodo-fim" class="month-input" />
+        </label>
+        <button class="link-btn" id="periodo-limpar">limpar período</button>
+      </div>
+      <div class="hint" id="busca-hint"></div>
+      <div class="scroll-x">
+        <table id="tbl-colaboradores"></table>
+      </div>
+
+      <div class="detail-panel" id="detalhe-painel">
+        <div class="detail-header">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <h3 id="detalhe-nome"></h3>
+            <span id="detalhe-situacao"></span>
+          </div>
+          <button class="close-btn" id="detalhe-fechar">fechar ✕</button>
+        </div>
+        <div class="sub" id="detalhe-matricula"></div>
+        <div class="detail-stats" id="detalhe-stats"></div>
+        <div class="scroll-x">
+          <table id="tbl-detalhe-sessoes"></table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="tab-page" id="page-presenca">
+    <section>
+      <h2>Pessoas presentes (dentro da empresa) — dia atual</h2>
+      <div class="hint">Considera o último evento de cada colaborador hoje: quem entrou e ainda não saiu de volta pra "Externa" está presente. Quem não teve nenhuma movimentação hoje conta como ausente.</div>
+
+      <div class="presenca-layout">
+        <div class="presenca-filtros">
+          <button class="export-btn" id="btn-exportar-presenca">⬇ Exportar dados completos</button>
+          <div class="total-presentes">
+            <b id="presenca-total">0</b>
+            pessoa(s) presente(s) agora
+          </div>
+          <label class="checkbox-label todas-label">
+            <input type="checkbox" id="presenca-todas" checked />
+            Todas as empresas e estruturas
+          </label>
+          <div class="lista-estruturas" id="presenca-lista-estruturas"></div>
+        </div>
+
+        <div class="presenca-chart-wrap">
+          <div class="bar-chart-vert" id="presenca-chart"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Turnos</h2>
+      <div class="hint">
+        Estimado pelo horário histórico da 1ª entrada de cada pessoa (últimos 3 meses) — o DIMEP não tem
+        um vínculo confiável pessoa → turno cadastrado, então isso <b>não é a escala oficial</b>, é uma aproximação.
+      </div>
+      <div class="subtabs" id="turno-tabs">
+        <button class="subtab-btn active" data-turno="1° Turno">1° Turno</button>
+        <button class="subtab-btn" data-turno="2° Turno">2° Turno</button>
+        <button class="subtab-btn" data-turno="3° Turno">3° Turno</button>
+        <button class="subtab-btn" data-turno="Turno Comercial">Turno Comercial</button>
+      </div>
+      <div class="turno-stats" id="turno-stats"></div>
+    </section>
+
+    <section>
+      <h2>Tempo médio de pausa por empresa/estrutura</h2>
+      <div class="hint">Cruza o tempo fora do posto (aba "Movimentações por setor") com a estrutura organizacional de cada pessoa — útil pra comparar terceirizadas/áreas.</div>
+      <div class="scroll-x">
+        <table id="tbl-estrutura-pausas"></table>
+      </div>
+    </section>
+  </div>
+
+<script>
+let DATA = null;
+let PESSOAS = [];
+let PRESENCA = [];
+let PRESENCA_FILTRO_ESTRUTURAS = null; // null = ainda nao inicializado (marca todas)
+let TURNO_SELECIONADO = "1° Turno";
+
+function el(tag, attrs = {}, children = []) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v;
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) e.append(c);
+  return e;
+}
+
+function fmtInt(n) {
+  return n.toLocaleString("pt-BR");
+}
+
+function buildTable(tableEl, headers, rows) {
+  tableEl.innerHTML = "";
+  const thead = el("thead", {}, [el("tr", {}, headers.map(h => el("th", {}, [h])))]);
+  const tbody = el("tbody", {}, rows);
+  tableEl.append(thead, tbody);
+}
+
+function renderVisaoGeral() {
+document.getElementById("gerado-em").textContent =
+  `Gerado em ${DATA.gerado_em} · período ${DATA.periodo.inicio} a ${DATA.periodo.fim}`;
+
+const cards = document.getElementById("cards");
+cards.innerHTML = "";
+const cardDefs = [
+  ["Total de linhas", fmtInt(DATA.total_linhas)],
+  ["Pessoas distintas", fmtInt(DATA.total_pessoas_distintas)],
+  ["Arquivos parquet", DATA.arquivos.length],
+  ["Tamanho total (MB)", DATA.arquivos.reduce((s, a) => s + a.tamanho_mb, 0).toFixed(1)],
+];
+for (const [label, value] of cardDefs) {
+  cards.append(el("div", { class: "card" }, [
+    el("div", { class: "label" }, [label]),
+    el("div", { class: "value" }, [String(value)]),
+  ]));
+}
+
+// Arquivos
+buildTable(
+  document.getElementById("tbl-arquivos"),
+  ["Arquivo", "Linhas", "Tamanho (MB)"],
+  DATA.arquivos.map(a => el("tr", {}, [
+    el("td", {}, [a.arquivo]),
+    el("td", {}, [fmtInt(a.linhas)]),
+    el("td", {}, [String(a.tamanho_mb)]),
+  ]))
+);
+
+// Movimentos
+const movTotal = Object.values(DATA.movimentos).reduce((a, b) => a + b, 0);
+const movColors = { ENTRADA: "var(--entrada)", SAIDA: "var(--saida)", OUTRO: "var(--outro)" };
+buildTable(
+  document.getElementById("tbl-movimentos"),
+  ["Movimento", "Quantidade", "% do total"],
+  Object.entries(DATA.movimentos).sort((a, b) => b[1] - a[1]).map(([mov, qtd]) => {
+    const pct = (100 * qtd / movTotal);
+    return el("tr", {}, [
+      el("td", {}, [el("span", { class: `tag tag-${mov}` }, [mov])]),
+      el("td", {}, [fmtInt(qtd)]),
+      el("td", {}, [el("div", { class: "bar-cell" }, [
+        el("div", { class: "bar-track" }, [
+          el("div", { class: "bar-fill", style: `width:${pct}%;background:${movColors[mov] || "#999"}` }, [])
+        ]),
+        el("span", {}, [pct.toFixed(1) + "%"]),
+      ])]),
+    ]);
+  })
+);
+
+// Transições de área
+buildTable(
+  document.getElementById("tbl-transicoes"),
+  ["Área origem", "Área destino", "Movimento", "Quantidade"],
+  DATA.top_transicoes_area.map(t => el("tr", {}, [
+    el("td", {}, [t.area_origem ?? "—"]),
+    el("td", {}, [t.area_destino ?? "—"]),
+    el("td", {}, [el("span", { class: `tag tag-${t.movimento}` }, [t.movimento])]),
+    el("td", {}, [fmtInt(t.quantidade)]),
+  ]))
+);
+
+// Estruturas
+const estMax = Math.max(...DATA.top_estruturas.map(e => e.quantidade), 1);
+buildTable(
+  document.getElementById("tbl-estruturas"),
+  ["Estrutura organizacional", "Quantidade"],
+  DATA.top_estruturas.map(e => el("tr", {}, [
+    el("td", {}, [e.estrutura ?? "—"]),
+    el("td", {}, [el("div", { class: "bar-cell" }, [
+      el("div", { class: "bar-track" }, [
+        el("div", { class: "bar-fill", style: `width:${100 * e.quantidade / estMax}%;background:var(--accent)` }, [])
+      ]),
+      el("span", {}, [fmtInt(e.quantidade)]),
+    ])]),
+  ]))
+);
+
+// Nulos
+buildTable(
+  document.getElementById("tbl-nulos"),
+  ["Coluna", "Linhas nulas"],
+  Object.entries(DATA.nulos_por_coluna).map(([col, n]) => el("tr", {}, [
+    el("td", {}, [col]),
+    el("td", { class: n > 0 ? "warn" : "ok" }, [fmtInt(n)]),
+  ]))
+);
+
+// Amostra
+buildTable(
+  document.getElementById("tbl-amostra"),
+  ["Matrícula", "Pessoa", "Área origem", "Área destino", "Movimento", "Data/hora"],
+  DATA.amostra.map(r => el("tr", {}, [
+    el("td", {}, [r.matricula ?? "—"]),
+    el("td", {}, [r.pessoa ?? "—"]),
+    el("td", {}, [r.area_origem ?? "—"]),
+    el("td", {}, [r.area_destino ?? "—"]),
+    el("td", {}, [el("span", { class: `tag tag-${r.movimento}` }, [r.movimento])]),
+    el("td", {}, [r.data_hora]),
+  ]))
+);
+}
+
+// ---- Tabs ----
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-page").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(`page-${btn.dataset.tab}`).classList.add("active");
+  });
+});
+
+// ---- Colaboradores: busca + detalhe ----
+function fmtDuracao(min) {
+  if (min == null) return "—";
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  if (h === 0) return `${m}min`;
+  return `${h}h ${String(m).padStart(2, "0")}min`;
+}
+
+function fmtDataHora(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso.replace(" ", "T"));
+  if (isNaN(d)) return iso;
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtHora(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso.replace(" ", "T"));
+  if (isNaN(d)) return iso;
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtDataCurta(dataStr) {
+  if (!dataStr) return "—";
+  const d = new Date(dataStr + "T00:00:00");
+  if (isNaN(d)) return dataStr;
+  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function normaliza(s) {
+  return (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+const STATUS_ATIVO = new Set(["Acesso Liberado", "Acesso Múltiplo"]);
+
+function statusTag(situacao) {
+  if (!situacao) return el("span", { class: "pill pill-desconhecido" }, ["não encontrado no cadastro"]);
+  const cls = STATUS_ATIVO.has(situacao) ? "pill-ativo" : "pill-inativo";
+  return el("span", { class: `pill ${cls}` }, [situacao]);
+}
+
+const buscaInput = document.getElementById("busca-colaborador");
+const filtroMediaAlta = document.getElementById("filtro-media-alta");
+const filtroAtivosSemPausa = document.getElementById("filtro-ativos-sem-pausa");
+const periodoInicio = document.getElementById("periodo-inicio");
+const periodoFim = document.getElementById("periodo-fim");
+const periodoLimpar = document.getElementById("periodo-limpar");
+const buscaHint = document.getElementById("busca-hint");
+const tblColaboradores = document.getElementById("tbl-colaboradores");
+const LIMITE_RESULTADOS = 100;
+const LIMITE_MEDIA_ALTA_MIN = 60;
+
+// soma os buckets mensais (meses/qtd_por_mes/tempo_por_mes) de uma pessoa dentro
+// do periodo [inicio, fim] (strings "AAAA-MM", qualquer uma pode ser vazia)
+function efetivoNoPeriodo(p, inicio, fim) {
+  if (!inicio && !fim) {
+    return {
+      qtd: p.qtd_pausas,
+      total: p.tempo_total_min,
+      medio: p.tempo_medio_min,
+      max: p.tempo_max_min,
+      porPosto: p.por_posto,
+      periodoAtivo: false,
+    };
+  }
+  let qtd = 0, total = 0;
+  const meses = p.meses || [];
+  for (let i = 0; i < meses.length; i++) {
+    const m = meses[i];
+    if ((!inicio || m >= inicio) && (!fim || m <= fim)) {
+      qtd += p.qtd_por_mes[i];
+      total += p.tempo_por_mes[i];
+    }
+  }
+  return {
+    qtd,
+    total: Math.round(total * 10) / 10,
+    medio: qtd > 0 ? Math.round((total / qtd) * 10) / 10 : 0,
+    max: null,    // so temos granularidade mensal; maior pausa exata nao e recalculavel aqui
+    porPosto: null,
+    periodoAtivo: true,
+  };
+}
+
+function renderResultadosColaboradores(termo) {
+  tblColaboradores.innerHTML = "";
+  const termoNorm = normaliza(termo);
+  const soMediaAlta = filtroMediaAlta.checked;
+  const inicio = periodoInicio.value;
+  const fim = periodoFim.value;
+  const periodoAtivo = Boolean(inicio || fim);
+
+  const soAtivosSemPausa = filtroAtivosSemPausa.checked;
+
+  let candidatos = PESSOAS;
+  if (termoNorm.length > 0) {
+    const termos = termoNorm.split(/\s+/).filter(Boolean);
+    candidatos = candidatos.filter(p => {
+      const nomeNorm = normaliza(p.nome);
+      const matriculaStr = String(p.matricula);
+      return termos.every(t => nomeNorm.includes(t) || matriculaStr.includes(t));
+    });
+  }
+  if (soAtivosSemPausa) {
+    candidatos = candidatos.filter(p => p.qtd_pausas === 0 && STATUS_ATIVO.has(p.situacao));
+  }
+
+  let comEfetivo = candidatos.map(p => ({ p, ef: efetivoNoPeriodo(p, inicio, fim) }));
+  if (periodoAtivo && !soAtivosSemPausa) {
+    comEfetivo = comEfetivo.filter(x => x.ef.qtd > 0);
+    comEfetivo.sort((a, b) => b.ef.total - a.ef.total);
+  }
+  if (soMediaAlta) {
+    comEfetivo = comEfetivo.filter(x => x.ef.medio > LIMITE_MEDIA_ALTA_MIN);
+  }
+
+  const partes = [];
+  if (periodoAtivo) partes.push(`período ${inicio || "início"} a ${fim || "hoje"}`);
+  if (soMediaAlta) partes.push("média de tempo fora acima de 1h");
+  if (soAtivosSemPausa) partes.push("ativos sem nenhuma movimentação");
+  const sufixo = partes.length ? ` (${partes.join(" · ")})` : "";
+
+  buscaHint.textContent = termoNorm.length === 0
+    ? `${comEfetivo.length.toLocaleString("pt-BR")} colaborador(es)${sufixo} · ordenado por tempo total fora`
+    : `${comEfetivo.length.toLocaleString("pt-BR")} resultado(s)${sufixo}` +
+      (comEfetivo.length > LIMITE_RESULTADOS ? ` · mostrando os ${LIMITE_RESULTADOS} primeiros` : "");
+
+  const linhas = comEfetivo.slice(0, LIMITE_RESULTADOS).map(({ p, ef }) => {
+    const postoTop = ef.porPosto ? Object.entries(ef.porPosto).sort((a, b) => b[1] - a[1])[0] : null;
+    const tr = el("tr", { class: "clickable" }, [
+      el("td", {}, [p.nome || "—"]),
+      el("td", {}, [String(p.matricula)]),
+      el("td", {}, [statusTag(p.situacao)]),
+      el("td", {}, [fmtInt(ef.qtd)]),
+      el("td", {}, [fmtDuracao(ef.total)]),
+      el("td", {}, [fmtDuracao(ef.medio)]),
+      el("td", {}, [ef.max == null ? "—" : fmtDuracao(ef.max)]),
+      el("td", {}, [postoTop ? `${postoTop[0]} (${postoTop[1]})` : "—"]),
+    ]);
+    tr.addEventListener("click", () => abrirDetalhe(p, inicio, fim));
+    return tr;
+  });
+
+  buildTable(tblColaboradores, ["Nome", "Matrícula", "Situação", "Saídas", "Tempo total fora", "Tempo médio", "Maior saída", "Setor mais usado"], linhas);
+}
+
+buscaInput.addEventListener("input", () => renderResultadosColaboradores(buscaInput.value));
+filtroMediaAlta.addEventListener("change", () => renderResultadosColaboradores(buscaInput.value));
+filtroAtivosSemPausa.addEventListener("change", () => renderResultadosColaboradores(buscaInput.value));
+periodoInicio.addEventListener("change", () => renderResultadosColaboradores(buscaInput.value));
+periodoFim.addEventListener("change", () => renderResultadosColaboradores(buscaInput.value));
+periodoLimpar.addEventListener("click", () => {
+  periodoInicio.value = "";
+  periodoFim.value = "";
+  renderResultadosColaboradores(buscaInput.value);
+});
+
+const detalhePainel = document.getElementById("detalhe-painel");
+document.getElementById("detalhe-fechar").addEventListener("click", () => {
+  detalhePainel.classList.remove("active");
+});
+
+async function abrirDetalhe(pessoa, inicio, fim) {
+  detalhePainel.classList.add("active");
+  document.getElementById("detalhe-nome").textContent = pessoa.nome || "(sem nome)";
+  const situacaoEl = document.getElementById("detalhe-situacao");
+  situacaoEl.innerHTML = "";
+  situacaoEl.append(statusTag(pessoa.situacao));
+  document.getElementById("detalhe-matricula").textContent = `Matrícula ${pessoa.matricula}` +
+    (inicio || fim ? ` · período ${inicio || "início"} a ${fim || "hoje"}` : "");
+
+  const statsEl = document.getElementById("detalhe-stats");
+  const tblDetalhe = document.getElementById("tbl-detalhe-sessoes");
+  tblDetalhe.innerHTML = "";
+  tblDetalhe.append(el("tbody", {}, [el("tr", {}, [el("td", { colspan: "4" }, ["Carregando..."])])]));
+
+  try {
+    const resp = await fetch(`pausas_pessoas/${pessoa.matricula}.json`);
+    if (!resp.ok) throw new Error("nao encontrado");
+    const detalhe = await resp.json();
+
+    let pausas = detalhe.pausas;
+    if (inicio || fim) {
+      pausas = pausas.filter(p => {
+        const mes = p.data.slice(0, 7);
+        return (!inicio || mes >= inicio) && (!fim || mes <= fim);
+      });
+    }
+
+    const duracoes = pausas.map(p => p.duracao_min);
+    const total = duracoes.reduce((a, b) => a + b, 0);
+    const medio = duracoes.length ? total / duracoes.length : 0;
+    const max = duracoes.length ? Math.max(...duracoes) : 0;
+
+    statsEl.innerHTML = "";
+    statsEl.append(
+      el("div", {}, [el("b", {}, [fmtInt(pausas.length)]), "saídas registradas"]),
+      el("div", {}, [el("b", {}, [fmtDuracao(total)]), "tempo total fora"]),
+      el("div", {}, [el("b", {}, [fmtDuracao(medio)]), "média por saída"]),
+      el("div", {}, [el("b", {}, [fmtDuracao(max)]), "maior saída"]),
+    );
+
+    tblDetalhe.innerHTML = "";
+
+    if (pausas.length === 0) {
+      tblDetalhe.append(el("tbody", {}, [el("tr", {}, [el("td", { colspan: "4", class: "empty-msg" }, ["Sem saídas registradas no período."])])]));
+    } else {
+      // pausas ja vem ordenadas da mais recente pra mais antiga; agrupar por dia
+      // preserva essa ordem naturalmente (datas do mesmo dia ficam contiguas)
+      const porDia = new Map();
+      for (const p of pausas) {
+        if (!porDia.has(p.data)) porDia.set(p.data, []);
+        porDia.get(p.data).push(p);
+      }
+
+      const linhas = [];
+      for (const [dia, itens] of porDia) {
+        const totalDia = itens.reduce((s, p) => s + p.duracao_min, 0);
+        linhas.push(el("tr", { class: "day-header-row" }, [
+          el("td", { colspan: "4" }, [
+            el("div", { class: "day-header" }, [
+              el("span", {}, [fmtDataCurta(dia)]),
+              el("span", { class: "day-total" }, [`${itens.length} saída(s) · ${fmtDuracao(totalDia)} no dia`]),
+            ])
+          ])
+        ]));
+        for (const p of itens) {
+          linhas.push(el("tr", {}, [
+            el("td", {}, [fmtHora(p.saida)]),
+            el("td", {}, [fmtHora(p.volta)]),
+            el("td", {}, [fmtDuracao(p.duracao_min)]),
+            el("td", {}, [p.posto || "—"]),
+          ]));
+        }
+      }
+
+      buildTable(tblDetalhe, ["Saída", "Volta", "Duração", "Setor"], linhas);
+    }
+  } catch (e) {
+    statsEl.innerHTML = "";
+    tblDetalhe.innerHTML = "";
+    tblDetalhe.append(el("tbody", {}, [el("tr", {}, [
+      el("td", { colspan: "4", class: "empty-msg" }, [
+        "Não foi possível carregar o detalhe. Abra o dashboard via servir_dashboard.py em vez de abrir o arquivo direto."
+      ])
+    ])]));
+  }
+}
+
+// ---- Presença & turnos ----
+
+function presencaAtivos() {
+  const situacaoPorMatricula = new Map(PESSOAS.map(p => [p.matricula, p.situacao]));
+  return PRESENCA.filter(p => STATUS_ATIVO.has(situacaoPorMatricula.get(p.matricula)));
+}
+
+function contarPorEstrutura(lista) {
+  const contagem = new Map();
+  for (const p of lista) {
+    const chave = (p.estrutura || "Sem estrutura").trim() || "Sem estrutura";
+    contagem.set(chave, (contagem.get(chave) || 0) + 1);
+  }
+  return contagem;
+}
+
+const CORES_GRAFICO = ["#2f6fed", "#2e9e5b", "#d1483f", "#e0b23a", "#8e5fd6", "#2ab7b0", "#e0729a", "#7a8ca0"];
+
+function renderPresenca() {
+  const presentes = presencaAtivos().filter(p => p.status !== "fora");
+  const porEstrutura = contarPorEstrutura(presentes);
+  const estruturasOrdenadas = [...porEstrutura.entries()].sort((a, b) => b[1] - a[1]);
+
+  if (PRESENCA_FILTRO_ESTRUTURAS === null) {
+    PRESENCA_FILTRO_ESTRUTURAS = new Set(estruturasOrdenadas.map(([nome]) => nome));
+  }
+
+  const todasMarcadas = estruturasOrdenadas.every(([nome]) => PRESENCA_FILTRO_ESTRUTURAS.has(nome));
+  document.getElementById("presenca-todas").checked = todasMarcadas;
+
+  const lista = document.getElementById("presenca-lista-estruturas");
+  lista.innerHTML = "";
+  for (const [nome, qtd] of estruturasOrdenadas) {
+    const input = el("input", { type: "checkbox" }, []);
+    input.checked = PRESENCA_FILTRO_ESTRUTURAS.has(nome);
+    input.addEventListener("change", () => {
+      if (input.checked) PRESENCA_FILTRO_ESTRUTURAS.add(nome);
+      else PRESENCA_FILTRO_ESTRUTURAS.delete(nome);
+      renderPresenca();
+    });
+    lista.append(el("label", { class: "checkbox-label" }, [
+      el("span", { style: "display:flex; align-items:center; gap:6px;" }, [input, el("span", {}, [nome])]),
+      el("span", {}, [String(qtd)]),
+    ]));
+  }
+
+  const filtrados = estruturasOrdenadas.filter(([nome]) => PRESENCA_FILTRO_ESTRUTURAS.has(nome));
+  const total = filtrados.reduce((s, [, qtd]) => s + qtd, 0);
+  document.getElementById("presenca-total").textContent = fmtInt(total);
+
+  const maxQtd = Math.max(...filtrados.map(([, qtd]) => qtd), 1);
+  const chart = document.getElementById("presenca-chart");
+  chart.innerHTML = "";
+  filtrados.forEach(([nome, qtd], i) => {
+    const alturaPct = Math.max(4, Math.round(100 * qtd / maxQtd));
+    chart.append(el("div", { class: "barra-col" }, [
+      el("div", { class: "barra-valor" }, [String(qtd)]),
+      el("div", { class: "barra", style: `height:${alturaPct}%;background:${CORES_GRAFICO[i % CORES_GRAFICO.length]}` }, []),
+      el("div", { class: "barra-label", title: nome }, [nome]),
+    ]));
+  });
+}
+
+document.getElementById("presenca-todas").addEventListener("change", (e) => {
+  const presentes = presencaAtivos().filter(p => p.status !== "fora");
+  const todasEstruturas = [...contarPorEstrutura(presentes).keys()];
+  PRESENCA_FILTRO_ESTRUTURAS = e.target.checked ? new Set(todasEstruturas) : new Set();
+  renderPresenca();
+});
+
+document.getElementById("btn-exportar-presenca").addEventListener("click", () => {
+  const linhas = [["Matrícula", "Nome", "Estrutura", "Status", "Turno estimado", "Acessou hoje", "Último evento"]];
+  for (const p of presencaAtivos()) {
+    const statusLabel = { fora: "Fora", refeitorio: "Refeitório", fabrica: "Fábrica", apoio: "Área de apoio" }[p.status] || p.status;
+    linhas.push([p.matricula, p.nome || "", p.estrutura || "", statusLabel, p.turno, p.acessou_hoje ? "Sim" : "Não", p.ultimo_evento]);
+  }
+  const csv = linhas.map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: `presenca_${new Date().toISOString().slice(0, 10)}.csv` }, []);
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+function renderTurnoStats(turno) {
+  const doTurno = presencaAtivos().filter(p => p.turno === turno);
+  const total = doTurno.length;
+  const acessaram = doTurno.filter(p => p.acessou_hoje).length;
+  const refeitorio = doTurno.filter(p => p.status === "refeitorio").length;
+  const fabrica = doTurno.filter(p => p.status === "fabrica").length;
+  const apoio = doTurno.filter(p => p.status === "apoio").length;
+  const ausentes = total - refeitorio - fabrica - apoio;
+
+  const linhas = [
+    ["Total de pessoas do turno", total, false],
+    ["Pessoas que acessaram hoje", acessaram, false],
+    ["Pessoas no refeitório", refeitorio, false],
+    ["Pessoas na fábrica", fabrica, false],
+    ["Pessoas em área de apoio", apoio, true],
+    ["Pessoas ausentes", ausentes, false],
+  ];
+
+  const box = document.getElementById("turno-stats");
+  box.innerHTML = "";
+  for (const [label, valor, alerta] of linhas) {
+    box.append(el("div", { class: "turno-stat-row" }, [
+      el("span", {}, [label]),
+      el("span", { class: `turno-badge${alerta ? " alerta" : ""}` }, [fmtInt(valor)]),
+    ]));
+  }
+}
+
+document.querySelectorAll("#turno-tabs .subtab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#turno-tabs .subtab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    TURNO_SELECIONADO = btn.dataset.turno;
+    renderTurnoStats(TURNO_SELECIONADO);
+  });
+});
+
+function renderRankingEstruturaPausas() {
+  const estruturaPorMatricula = new Map(PRESENCA.map(p => [p.matricula, (p.estrutura || "Sem estrutura").trim() || "Sem estrutura"]));
+  const agregados = new Map(); // estrutura -> { tempo, qtd, pessoas }
+  for (const p of PESSOAS) {
+    const estrutura = estruturaPorMatricula.get(p.matricula);
+    if (!estrutura) continue;
+    const acc = agregados.get(estrutura) || { tempo: 0, qtd: 0, pessoas: 0 };
+    acc.tempo += p.tempo_total_min || 0;
+    acc.qtd += p.qtd_pausas || 0;
+    acc.pessoas += 1;
+    agregados.set(estrutura, acc);
+  }
+
+  const linhas = [...agregados.entries()]
+    .map(([estrutura, acc]) => ({
+      estrutura,
+      pessoas: acc.pessoas,
+      qtd: acc.qtd,
+      medioPorPessoa: acc.pessoas ? acc.tempo / acc.pessoas : 0,
+    }))
+    .filter(r => r.qtd > 0)
+    .sort((a, b) => b.medioPorPessoa - a.medioPorPessoa)
+    .slice(0, 20);
+
+  const maxMedio = Math.max(...linhas.map(r => r.medioPorPessoa), 1);
+  buildTable(
+    document.getElementById("tbl-estrutura-pausas"),
+    ["Estrutura", "Pessoas", "Saídas registradas", "Tempo fora médio por pessoa"],
+    linhas.map(r => el("tr", {}, [
+      el("td", {}, [r.estrutura]),
+      el("td", {}, [fmtInt(r.pessoas)]),
+      el("td", {}, [fmtInt(r.qtd)]),
+      el("td", {}, [el("div", { class: "bar-cell" }, [
+        el("div", { class: "bar-track" }, [
+          el("div", { class: "bar-fill", style: `width:${100 * r.medioPorPessoa / maxMedio}%;background:var(--accent)` }, []),
+        ]),
+        el("span", {}, [fmtDuracao(r.medioPorPessoa)]),
+      ])]),
+    ]))
+  );
+}
+
+// ---- Carregamento dos dados + atualização periódica ----
+// validacao.json e pessoas_pausas_resumo.json sao regravados pelo
+// scheduler_pausas.py a cada poucos minutos; aqui so buscamos de novo e
+// re-renderizamos, sem recarregar a pagina (preserva busca/filtros abertos).
+const INTERVALO_ATUALIZACAO_MS = 5 * 60 * 1000;
+
+async function carregarDados() {
+  try {
+    const [dataResp, pessoasResp, presencaResp] = await Promise.all([
+      fetch(`validacao.json?t=${Date.now()}`),
+      fetch(`pessoas_pausas_resumo.json?t=${Date.now()}`),
+      fetch(`presenca.json?t=${Date.now()}`),
+    ]);
+    if (!dataResp.ok || !pessoasResp.ok || !presencaResp.ok) throw new Error("falha ao buscar dados");
+    DATA = await dataResp.json();
+    PESSOAS = await pessoasResp.json();
+    PRESENCA = await presencaResp.json();
+    renderVisaoGeral();
+    renderResultadosColaboradores(buscaInput.value);
+    renderPresenca();
+    renderTurnoStats(TURNO_SELECIONADO);
+    renderRankingEstruturaPausas();
+  } catch (e) {
+    document.getElementById("gerado-em").textContent =
+      "Não foi possível carregar os dados. Abra o dashboard via servir_dashboard.py em vez de abrir o arquivo direto.";
+  }
+}
+
+carregarDados();
+setInterval(carregarDados, INTERVALO_ATUALIZACAO_MS);
+</script>
+</body>
+</html>
