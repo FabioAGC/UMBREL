@@ -51,7 +51,7 @@ Com isso, 1 tela ou 100 telas abertas geram a mesma carga nos sistemas da planta
 1. **App Store do Umbrel → Portainer → Install.** Abra o Portainer e troque a senha padrão.
 2. **Registries → Add registry → Custom:** URL `ghcr.io`, usuário `FabioAGC`, senha = token com `read:packages`.
 3. **Stacks → Add stack → Repository:**
-   - Repository URL: `https://github.com/FabioAGC/fabrica-apps`, com autenticação (usuário + token)
+   - Repository URL: `https://github.com/FabioAGC/UMBREL`, com autenticação (usuário + token)
    - Compose path: `docker-compose.yml`
    - **Environment variables:** cadastre cada linha do `.env.example` com os valores reais
    - (Opcional) **GitOps updates → Polling a cada 5 min:** todo push na `main` reimplanta sozinho
